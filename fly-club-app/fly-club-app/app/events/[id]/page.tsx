@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, use } from "react";
+import { Fragment, useEffect, useState, use } from "react";
 import { supabase, Member, EventRow } from "@/lib/supabase";
 import { useAdmin } from "@/lib/useAdmin";
 
@@ -24,6 +24,89 @@ type Result = {
   total_group: number;
   total_flys: number;
 };
+
+// Saved values for an entry as strings keyed s1..s5 (score), g1..g5 (group), f1..f5 (flys)
+function baseline(entry: Entry): Record<string, string> {
+  const v: Record<string, string> = {};
+  for (const c of CARDS) {
+    const card = entry.scores?.find((s) => s.card === c);
+    v[`s${c}`] = String(card?.score ?? 0);
+    v[`g${c}`] = String(card?.group_score ?? 0);
+    v[`f${c}`] = String(card?.flys ?? 0);
+  }
+  return v;
+}
+
+// One compact row per shooter: five cards of Score / Group / Flys, live totals, Save.
+function ScoreRow({
+  entry, onSaved, onRemove, onError,
+}: {
+  entry: Entry;
+  onSaved: () => void;
+  onRemove: (id: number) => void;
+  onError: (msg: string) => void;
+}) {
+  const saved = baseline(entry);
+  const [vals, setVals] = useState<Record<string, string>>(saved);
+  const [saving, setSaving] = useState(false);
+
+  const num = (k: string) => Number(vals[k] || 0);
+  const total = (p: string) => CARDS.reduce((t, c) => t + num(`${p}${c}`), 0);
+  const dirty = Object.keys(saved).some((k) => Number(vals[k] || 0) !== Number(saved[k]));
+
+  async function save() {
+    setSaving(true);
+    const rows = CARDS.map((c) => ({
+      entry_id: entry.id,
+      card: c,
+      score: num(`s${c}`),
+      group_score: num(`g${c}`),
+      flys: Math.round(num(`f${c}`)),
+    }));
+    const { error } = await supabase.from("scores").upsert(rows, { onConflict: "entry_id,card" });
+    setSaving(false);
+    if (error) onError(error.message); else { onError(""); onSaved(); }
+  }
+
+  const cell = (k: string, i: number) => (
+    <td key={k} className={`mini-cell${i === 0 ? " sep" : ""}`}>
+      <input
+        className="mini"
+        type="number"
+        step="any"
+        inputMode="decimal"
+        value={vals[k]}
+        aria-label={`${entry.members.name} card ${k.slice(1)} ${k[0] === "s" ? "score" : k[0] === "g" ? "group" : "flys"}`}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
+        onKeyDown={(e) => { if (e.key === "Enter") save(); }}
+      />
+    </td>
+  );
+
+  return (
+    <tr className={dirty ? "dirty" : ""}>
+      <td className="bay"><strong>{entry.bay}</strong> <span className="muted small">D{entry.detail}</span></td>
+      <td className="name">{entry.members.name}</td>
+      {CARDS.map((c) => (
+        <Fragment key={c}>
+          {cell(`s${c}`, 0)}
+          {cell(`g${c}`, 1)}
+          {cell(`f${c}`, 2)}
+        </Fragment>
+      ))}
+      <td className="num sep tot"><strong>{total("s")}</strong></td>
+      <td className="num tot">{total("g")}</td>
+      <td className="num tot">{total("f")}</td>
+      <td className="actions">
+        <button type="button" className={dirty ? "" : "secondary"} disabled={!dirty || saving} onClick={save}>
+          {saving ? "…" : dirty ? "Save" : "Saved"}
+        </button>
+        <button type="button" className="danger icon" aria-label={`Remove ${entry.members.name}`} onClick={() => onRemove(entry.id)}>✕</button>
+      </td>
+    </tr>
+  );
+}
 
 export default function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -76,22 +159,6 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
     load();
   }
 
-  async function saveScores(entry: Entry, form: HTMLFormElement) {
-    const f = new FormData(form);
-    const n = (k: string) => Number(f.get(k) || 0);
-    const rows = CARDS.map((c) => ({
-      entry_id: entry.id,
-      card: c,
-      score: n(`score_${c}`),
-      group_score: n(`group_${c}`),
-      flys: n(`flys_${c}`),
-    }));
-    const { error } = await supabase.from("scores").upsert(rows, { onConflict: "entry_id,card" });
-    if (error) setError(error.message); else { setError(""); load(); }
-  }
-
-  const sum = (cards: Card[], k: keyof Card) => cards.reduce((t, c) => t + Number(c[k] || 0), 0);
-
   if (!event) return <p className="muted">Loading…</p>;
 
   return (
@@ -137,47 +204,44 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
           </form>
 
           <h2>Enter scores</h2>
-          {entries.map((en) => {
-            const byCard = (c: number) => en.scores?.find((s) => s.card === c);
-            const total = `${sum(en.scores || [], "score")}-${sum(en.scores || [], "group_score")}-${sum(en.scores || [], "flys")}`;
-            return (
-              <form
-                key={`${en.id}-${total}`}
-                className="card"
-                onSubmit={(e) => { e.preventDefault(); saveScores(en, e.currentTarget); }}
-              >
-                <div className="row" style={{ marginTop: 0 }}>
-                  <strong>{en.members.name}</strong>
-                  <span className="muted">Detail {en.detail} · Bay {en.bay}</span>
-                  <span style={{ flex: 1 }} />
-                  <span>
-                    Total: <strong>{sum(en.scores || [], "score")}</strong> score ·{" "}
-                    <strong>{sum(en.scores || [], "group_score")}</strong> group ·{" "}
-                    <strong>{sum(en.scores || [], "flys")}</strong> flys
-                  </span>
-                </div>
-                <table>
-                  <thead>
-                    <tr><th>Card</th><th className="num">Score</th><th className="num">Group</th><th className="num">Flys</th></tr>
-                  </thead>
-                  <tbody>
-                    {CARDS.map((c) => (
-                      <tr key={c}>
-                        <td>Card {c}</td>
-                        <td className="num"><input className="score" name={`score_${c}`} type="number" step="any" defaultValue={byCard(c)?.score ?? 0} aria-label={`${en.members.name} card ${c} score`} /></td>
-                        <td className="num"><input className="score" name={`group_${c}`} type="number" step="any" defaultValue={byCard(c)?.group_score ?? 0} aria-label={`${en.members.name} card ${c} group`} /></td>
-                        <td className="num"><input className="score" name={`flys_${c}`} type="number" defaultValue={byCard(c)?.flys ?? 0} aria-label={`${en.members.name} card ${c} flys`} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="row">
-                  <button type="submit">Save scores</button>
-                  <button type="button" className="danger" onClick={() => removeEntry(en.id)}>Remove shooter</button>
-                </div>
-              </form>
-            );
-          })}
+          <p className="muted small" style={{ marginTop: -8 }}>
+            S = score, G = group, F = flys. Press Enter in any box to save that row.
+          </p>
+          <div className="sheet-wrap">
+            <table className="sheet">
+              <thead>
+                <tr>
+                  <th rowSpan={2}>Bay</th>
+                  <th rowSpan={2}>Shooter</th>
+                  {CARDS.map((c) => <th key={c} colSpan={3} className="sep centre">Card {c}</th>)}
+                  <th colSpan={3} className="sep centre">Total</th>
+                  <th rowSpan={2} />
+                </tr>
+                <tr>
+                  {CARDS.map((c) => (
+                    <Fragment key={c}>
+                      <th className="sep centre">S</th><th className="centre">G</th><th className="centre">F</th>
+                    </Fragment>
+                  ))}
+                  <th className="sep centre">S</th><th className="centre">G</th><th className="centre">F</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((en) => (
+                  <ScoreRow
+                    key={en.id}
+                    entry={en}
+                    onSaved={load}
+                    onRemove={removeEntry}
+                    onError={setError}
+                  />
+                ))}
+                {entries.length === 0 && (
+                  <tr><td colSpan={21} className="muted">Add a shooter above to start entering scores.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </>

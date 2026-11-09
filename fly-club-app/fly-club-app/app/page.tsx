@@ -12,6 +12,7 @@ type Row = {
   total_flys: number;
   total_group: number;
   total_score: number;
+  total_points: number;
 };
 
 const fmt = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-AU");
@@ -77,7 +78,7 @@ export default function SeasonRanking() {
         </select>
         {season && (
           <span className="muted">
-            {fmt(season.start_date)} to {fmt(season.end_date)} · ranked by total flys, then total score
+            {fmt(season.start_date)} to {fmt(season.end_date)} · ranked by total flys, then Total Score (score + group)
           </span>
         )}
       </div>
@@ -88,8 +89,9 @@ export default function SeasonRanking() {
             <th>#</th><th>Name</th>
             <th className="num">Events</th>
             <th className="num">Flys</th>
+            <th className="num">Score</th>
             <th className="num">Group</th>
-            <th className="num">Total score</th>
+            <th className="num">Total Score</th>
           </tr>
         </thead>
         <tbody>
@@ -99,12 +101,13 @@ export default function SeasonRanking() {
               <td>{r.name}</td>
               <td className="num">{r.events_shot}</td>
               <td className="num">{r.total_flys}</td>
-              <td className="num">{r.total_group}</td>
               <td className="num">{r.total_score}</td>
+              <td className="num">{r.total_group}</td>
+              <td className="num"><strong>{r.total_points}</strong></td>
             </tr>
           ))}
           {rows.length === 0 && (
-            <tr><td colSpan={6} className="muted">No scores in this season yet.</td></tr>
+            <tr><td colSpan={7} className="muted">No scores in this season yet.</td></tr>
           )}
         </tbody>
       </table>

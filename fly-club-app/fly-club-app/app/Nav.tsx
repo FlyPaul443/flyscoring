@@ -7,16 +7,18 @@ export default function Nav() {
   const isAdmin = useAdmin();
   return (
     <nav>
-      <Link href="/">Season</Link>
-      <Link href="/events">Events</Link>
-      <Link href="/members">Members</Link>
+      {isAdmin && (
+        <>
+          <Link href="/">Season</Link>
+          <Link href="/events">Events</Link>
+          <Link href="/members">Members</Link>
+        </>
+      )}
       <span className="spacer" />
-      {isAdmin ? (
+      {isAdmin && (
         <a href="#" onClick={(e) => { e.preventDefault(); supabase.auth.signOut(); }}>
           Sign out
         </a>
-      ) : (
-        <Link href="/login">Admin login</Link>
       )}
     </nav>
   );

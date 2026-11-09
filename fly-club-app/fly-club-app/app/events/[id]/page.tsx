@@ -23,6 +23,7 @@ type Result = {
   total_score: number;
   total_group: number;
   total_flys: number;
+  total_points: number;
 };
 
 // Saved values for an entry as strings keyed s1..s5 (score), g1..g5 (group), f1..f5 (flys)
@@ -97,6 +98,7 @@ function ScoreRow({
       ))}
       <td className="num sep tot"><strong>{total("s")}</strong></td>
       <td className="num tot">{total("g")}</td>
+      <td className="num tot"><strong>{total("s") + total("g")}</strong></td>
       <td className="num tot">{total("f")}</td>
       <td className="actions">
         <button type="button" className={dirty ? "" : "secondary"} disabled={!dirty || saving} onClick={save}>
@@ -172,19 +174,21 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
         <thead>
           <tr>
             <th>#</th><th>Name</th><th>Detail</th><th>Bay</th>
-            <th className="num">Score</th><th className="num">Group</th><th className="num">Flys</th>
+            <th className="num">Score</th><th className="num">Group</th>
+            <th className="num">Total Score</th><th className="num">Flys</th>
           </tr>
         </thead>
         <tbody>
           {results.map((r, i) => (
             <tr key={i}>
               <td>{r.position}</td><td>{r.name}</td><td>{r.detail}</td><td>{r.bay}</td>
-              <td className="num"><strong>{r.total_score}</strong></td>
+              <td className="num">{r.total_score}</td>
               <td className="num">{r.total_group}</td>
+              <td className="num"><strong>{r.total_points}</strong></td>
               <td className="num">{r.total_flys}</td>
             </tr>
           ))}
-          {results.length === 0 && <tr><td colSpan={7} className="muted">No entries yet.</td></tr>}
+          {results.length === 0 && <tr><td colSpan={8} className="muted">No entries yet.</td></tr>}
         </tbody>
       </table>
 
@@ -205,7 +209,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
 
           <h2>Enter scores</h2>
           <p className="muted small" style={{ marginTop: -8 }}>
-            S = score, G = group, F = flys. Press Enter in any box to save that row.
+            S = score, G = group, F = flys, T = total score (S + G). Press Enter in any box to save that row.
           </p>
           <div className="sheet-wrap">
             <table className="sheet">
@@ -214,7 +218,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                   <th rowSpan={2}>Bay</th>
                   <th rowSpan={2}>Shooter</th>
                   {CARDS.map((c) => <th key={c} colSpan={3} className="sep centre">Card {c}</th>)}
-                  <th colSpan={3} className="sep centre">Total</th>
+                  <th colSpan={4} className="sep centre">Total</th>
                   <th rowSpan={2} />
                 </tr>
                 <tr>
@@ -223,7 +227,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                       <th className="sep centre">S</th><th className="centre">G</th><th className="centre">F</th>
                     </Fragment>
                   ))}
-                  <th className="sep centre">S</th><th className="centre">G</th><th className="centre">F</th>
+                  <th className="sep centre">S</th><th className="centre">G</th><th className="centre">T</th><th className="centre">F</th>
                 </tr>
               </thead>
               <tbody>
@@ -237,7 +241,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                   />
                 ))}
                 {entries.length === 0 && (
-                  <tr><td colSpan={21} className="muted">Add a shooter above to start entering scores.</td></tr>
+                  <tr><td colSpan={22} className="muted">Add a shooter above to start entering scores.</td></tr>
                 )}
               </tbody>
             </table>

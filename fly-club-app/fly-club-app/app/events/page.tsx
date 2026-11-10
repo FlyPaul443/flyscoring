@@ -1,85 +1,47 @@
 "use client";
 import { useEffect, useState } from "react";
-import { supabase, Member } from "@/lib/supabase";
+import Link from "next/link";
+import { supabase, EventRow } from "@/lib/supabase";
 import { useAdmin } from "@/lib/useAdmin";
 
-export default function Members() {
+export default function Events() {
   const isAdmin = useAdmin();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [name, setName] = useState("");
-  const [number, setNumber] = useState("");
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [date, setDate] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState("");
 
   async function load() {
-    const { data } = await supabase.from("members").select("*").order("name");
-    setMembers((data as Member[]) || []);
+    const { data } = await supabase.from("events").select("*").order("event_date", { ascending: false });
+    setEvents((data as EventRow[]) || []);
   }
   useEffect(() => { load(); }, []);
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    const n = number.trim() === "" ? null : Number(number);
-    if (n !== null && !Number.isInteger(n)) return setError("Membership number must be a whole number.");
-    const { error } = await supabase
-      .from("members")
-      .insert({ name: name.trim(), Membership_Number: n });
+    const { error } = await supabase.from("events").insert({ event_date: date, description });
     if (error) return setError(error.message);
-    setName(""); setNumber(""); setError(""); load();
-  }
-
-  async function saveNumber(m: Member, value: string) {
-    const v = value.trim() === "" ? null : Number(value);
-    if (v !== null && !Number.isInteger(v)) return setError("Membership number must be a whole number.");
-    if (v === m.Membership_Number) return;
-    const { error } = await supabase.from("members").update({ Membership_Number: v }).eq("id", m.id);
-    if (error) setError(error.message); else { setError(""); load(); }
-  }
-
-  async function remove(id: number) {
-    if (!confirm("Delete this member?")) return;
-    const { error } = await supabase.from("members").delete().eq("id", id);
-    if (error) setError(error.message);
-    load();
+    setDate(""); setDescription(""); setError(""); load();
   }
 
   return (
     <>
-      <h1>Members</h1>
+      <h1>Events</h1>
       {isAdmin && (
         <form onSubmit={add} className="row">
-          <input placeholder="Member name" value={name} onChange={(e) => setName(e.target.value)} required />
-          <input type="number" placeholder="Membership no." value={number} onChange={(e) => setNumber(e.target.value)} style={{ width: 150 }} />
-          <button type="submit">Add member</button>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+          <input placeholder="Event description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+          <button type="submit">Add event</button>
         </form>
-      )}
-      {isAdmin && (
-        <p className="muted small">To add or fix a membership number, type it in the box and click out of it to save.</p>
       )}
       {error && <p className="error">{error}</p>}
       <table>
-        <thead><tr><th>Membership no.</th><th>Name</th>{isAdmin && <th />}</tr></thead>
+        <thead><tr><th>Date</th><th>Description</th></tr></thead>
         <tbody>
-          {members.map((m) => (
-            <tr key={m.id}>
-              <td>
-                {isAdmin ? (
-                  <input
-                    key={`${m.id}-${m.Membership_Number}`}
-                    type="number"
-                    defaultValue={m.Membership_Number ?? ""}
-                    placeholder="—"
-                    aria-label={`${m.name} membership number`}
-                    style={{ width: 120 }}
-                    onBlur={(e) => saveNumber(m, e.target.value)}
-                  />
-                ) : (
-                  m.Membership_Number ?? ""
-                )}
-              </td>
-              <td>{m.name}</td>
-              {isAdmin && (
-                <td><button className="danger" onClick={() => remove(m.id)}>Delete</button></td>
-              )}
+          {events.map((ev) => (
+            <tr key={ev.id}>
+              <td>{ev.event_date}</td>
+              <td><Link href={`/events/${ev.id}`}>{ev.description}</Link></td>
             </tr>
           ))}
         </tbody>

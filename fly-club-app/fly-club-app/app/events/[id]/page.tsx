@@ -123,6 +123,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
   const [detail, setDetail] = useState(1);
   const [bay, setBay] = useState("1A");
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"entry" | "results">("entry");
 
   async function load() {
     const [ev, mem, ent, res] = await Promise.all([
@@ -169,7 +170,16 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
       <p className="muted">{event.event_date}</p>
       {error && <p className="error">{error}</p>}
 
-      <h2>Results</h2>
+      <div className="tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={tab === "entry"} className={tab === "entry" ? "tab active" : "tab"} onClick={() => setTab("entry")}>
+          Score entry
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "results"} className={tab === "results" ? "tab active" : "tab"} onClick={() => setTab("results")}>
+          Results
+        </button>
+      </div>
+
+      {tab === "results" && (
       <table>
         <thead>
           <tr>
@@ -191,10 +201,10 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
           {results.length === 0 && <tr><td colSpan={8} className="muted">No entries yet.</td></tr>}
         </tbody>
       </table>
+      )}
 
-      {isAdmin && (
+      {tab === "entry" && isAdmin && (
         <>
-          <h2>Add shooter</h2>
           <form onSubmit={addEntry} className="row">
             <select value={memberId} onChange={(e) => setMemberId(e.target.value)} required>
               <option value="">Select member…</option>
@@ -207,8 +217,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
             <button type="submit">Add</button>
           </form>
 
-          <h2>Enter scores</h2>
-          <p className="muted small" style={{ marginTop: -8 }}>
+          <p className="muted small" style={{ marginTop: 0 }}>
             S = score, G = group, F = flys, T = total score (S + G). Press Enter in any box to save that row.
           </p>
           <div className="sheet-wrap">

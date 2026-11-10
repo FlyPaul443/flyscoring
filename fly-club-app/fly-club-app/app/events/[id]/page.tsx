@@ -208,7 +208,11 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
           <form onSubmit={addEntry} className="row">
             <select value={memberId} onChange={(e) => setMemberId(e.target.value)} required>
               <option value="">Select member…</option>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}{m.Membership_Number != null ? ` · #${m.Membership_Number}` : ""}
+                </option>
+              ))}
             </select>
             <label>Detail <input type="number" min={1} value={detail} onChange={(e) => setDetail(Number(e.target.value))} style={{ width: 70 }} /></label>
             <select value={bay} onChange={(e) => setBay(e.target.value)}>

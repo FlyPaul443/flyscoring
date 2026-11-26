@@ -2,6 +2,7 @@
 import { Fragment, useEffect, useState, use } from "react";
 import { supabase, Member, EventRow } from "@/lib/supabase";
 import { useAdmin } from "@/lib/useAdmin";
+import { classesFor, className, CLASS_ORDER, MATCH_NAMES, ShootClass } from "@/lib/classes";
 
 const BAYS = Array.from({ length: 10 }, (_, i) => [`${i + 1}A`, `${i + 1}B`]).flat();
 const CARDS = [1, 2, 3, 4, 5];
@@ -9,6 +10,7 @@ const CARDS = [1, 2, 3, 4, 5];
 type Card = { card: number; score: number; group_score: number; flys: number };
 type Entry = {
   id: number;
+  shoot_class: string;
   detail: number;
   bay: string;
   members: { name: string };
@@ -16,6 +18,7 @@ type Entry = {
 };
 
 type Result = {
+  shoot_class: string;
   position: number;
   name: string;
   detail: number;
@@ -88,7 +91,7 @@ function ScoreRow({
   return (
     <tr className={dirty ? "dirty" : ""}>
       <td className="bay"><strong>{entry.bay}</strong> <span className="muted small">D{entry.detail}</span></td>
-      <td className="name">{entry.members.name}</td>
+      <td className="name">{entry.members.name} <span className="muted small">{entry.shoot_class}</span></td>
       {CARDS.map((c) => (
         <Fragment key={c}>
           {cell(`s${c}`, 0)}
@@ -121,6 +124,7 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
   const [results, setResults] = useState<Result[]>([]);
   const [memberId, setMemberId] = useState("");
   const [detail, setDetail] = useState(1);
+  const [shootClass, setShootClass] = useState<ShootClass>("CF");
   const [bay, setBay] = useState("1A");
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"entry" | "results">("entry");
@@ -131,11 +135,12 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
       supabase.from("members").select("*").order("name"),
       supabase
         .from("entries")
-        .select("id, detail, bay, members(name), scores(card, score, group_score, flys)")
+        .select("id, shoot_class, detail, bay, members(name), scores(card, score, group_score, flys)")
         .eq("event_id", eventId)
+        .order("shoot_class")
         .order("detail")
         .order("bay"),
-      supabase.from("event_results").select("*").eq("event_id", eventId).order("position"),
+      supabase.from("event_results").select("*").eq("event_id", eventId).order("shoot_class").order("position"),
     ]);
     setEvent(ev.data as EventRow);
     setMembers((mem.data as Member[]) || []);
@@ -144,14 +149,20 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
   }
   useEffect(() => { load(); }, [eventId]);
 
+  // Class actually used: the chosen one if allowed for this event type, else CF (club) or LG (State/Registered).
+  function effClass(): ShootClass {
+    const ok = classesFor(event?.match_type);
+    return ok.includes(shootClass) ? shootClass : event?.match_type === "club" || !event ? "CF" : "LG";
+  }
+
   async function addEntry(e: React.FormEvent) {
     e.preventDefault();
     // The database creates the five blank cards automatically.
     const { error } = await supabase
       .from("entries")
-      .insert({ event_id: eventId, member_id: Number(memberId), detail, bay });
+      .insert({ event_id: eventId, member_id: Number(memberId), shoot_class: effClass(), detail, bay });
     if (error) return setError(error.message.includes("duplicate")
-      ? "That shooter is already entered, or that bay is taken in this detail."
+      ? "That shooter is already entered in this class, or that bay is taken in this detail."
       : error.message);
     setError(""); setMemberId(""); load();
   }
@@ -163,11 +174,14 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
   }
 
   if (!event) return <p className="muted">Loading…</p>;
+  const allowed = classesFor(event.match_type);
+  const classOf = (c: string) => results.filter((r) => r.shoot_class === c);
+  const shownClasses = CLASS_ORDER.filter((c) => classOf(c).length > 0);
 
   return (
     <>
       <h1>{event.description}</h1>
-      <p className="muted">{event.event_date}</p>
+      <p className="muted">{event.event_date} · {MATCH_NAMES[event.match_type] ?? "Club shoot"}</p>
       {error && <p className="error">{error}</p>}
 
       <div className="tabs" role="tablist">
@@ -180,27 +194,34 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
       </div>
 
       {tab === "results" && (
-      <table>
-        <thead>
-          <tr>
-            <th>#</th><th>Name</th><th>Detail</th><th>Bay</th>
-            <th className="num">Score</th><th className="num">Group</th>
-            <th className="num">Total Score</th><th className="num">Flys</th>
-          </tr>
-        </thead>
-        <tbody>
-          {results.map((r, i) => (
-            <tr key={i}>
-              <td>{r.position}</td><td>{r.name}</td><td>{r.detail}</td><td>{r.bay}</td>
-              <td className="num">{r.total_score}</td>
-              <td className="num">{r.total_group}</td>
-              <td className="num"><strong>{r.total_points}</strong></td>
-              <td className="num">{r.total_flys}</td>
-            </tr>
+        <>
+          {shownClasses.map((c) => (
+            <section key={c}>
+              <h2>{className(c)}</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th><th>Name</th><th>Detail</th><th>Bay</th>
+                    <th className="num">Score</th><th className="num">Group</th>
+                    <th className="num">Total Score</th><th className="num">Flys</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {classOf(c).map((r, i) => (
+                    <tr key={i}>
+                      <td>{r.position}</td><td>{r.name}</td><td>{r.detail}</td><td>{r.bay}</td>
+                      <td className="num">{r.total_score}</td>
+                      <td className="num">{r.total_group}</td>
+                      <td className="num"><strong>{r.total_points}</strong></td>
+                      <td className="num">{r.total_flys}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
           ))}
-          {results.length === 0 && <tr><td colSpan={8} className="muted">No entries yet.</td></tr>}
-        </tbody>
-      </table>
+          {shownClasses.length === 0 && <p className="muted">No entries yet.</p>}
+        </>
       )}
 
       {tab === "entry" && isAdmin && (
@@ -213,6 +234,9 @@ export default function EventPage({ params }: { params: Promise<{ id: string }> 
                   {m.name}{m.Membership_Number != null ? ` · #${m.Membership_Number}` : ""}
                 </option>
               ))}
+            </select>
+            <select value={effClass()} onChange={(e) => setShootClass(e.target.value as ShootClass)} aria-label="Class">
+              {allowed.map((c) => <option key={c} value={c}>{className(c)}</option>)}
             </select>
             <label>Detail <input type="number" min={1} value={detail} onChange={(e) => setDetail(Number(e.target.value))} style={{ width: 70 }} /></label>
             <select value={bay} onChange={(e) => setBay(e.target.value)}>

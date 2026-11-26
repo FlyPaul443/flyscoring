@@ -2,9 +2,11 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAdmin } from "@/lib/useAdmin";
+import { CLASS_ORDER, className } from "@/lib/classes";
 
 type Season = { id: number; name: string; start_date: string; end_date: string };
 type Row = {
+  shoot_class: string;
   position: number;
   member_id: number;
   name: string;
@@ -45,6 +47,7 @@ export default function SeasonRanking() {
       .from("season_ranking")
       .select("*")
       .eq("season_id", seasonId)
+      .order("shoot_class")
       .order("position")
       .then(({ data }) => setRows((data as Row[]) || []));
   }, [seasonId]);
@@ -83,6 +86,10 @@ export default function SeasonRanking() {
         )}
       </div>
 
+      <p className="muted small">Club shoots only, ranked separately for each class.</p>
+      {CLASS_ORDER.filter((c) => rows.some((r) => r.shoot_class === c)).map((c) => (
+        <section key={c}>
+          <h2>{className(c)}</h2>
       <table>
         <thead>
           <tr>
@@ -95,7 +102,7 @@ export default function SeasonRanking() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.filter((r) => r.shoot_class === c).map((r) => (
             <tr key={r.member_id}>
               <td>{r.position}</td>
               <td>{r.name}</td>
@@ -106,11 +113,11 @@ export default function SeasonRanking() {
               <td className="num"><strong>{r.total_points}</strong></td>
             </tr>
           ))}
-          {rows.length === 0 && (
-            <tr><td colSpan={7} className="muted">No scores in this season yet.</td></tr>
-          )}
         </tbody>
       </table>
+        </section>
+      ))}
+      {rows.length === 0 && <p className="muted">No scores in this season yet.</p>}
 
       {isAdmin && (
         <>

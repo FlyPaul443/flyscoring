@@ -36,3 +36,12 @@ Next.js + Supabase, deployed on Vercel. Admin-only editing; everyone can view re
 
 Names are matched ignoring case, so keep spelling consistent. Re-importing the same shooter and
 event updates the scores rather than duplicating them.
+
+## Public results page
+
+`/results` (for example flyscoring.vercel.app/results) is open to anyone without a login. It has a
+Championship tab (pick a season) and a Weekly scores tab (pick an event). Visitors see first names,
+bays, scores and totals only. Members, membership numbers, entries and all editing need a login, and
+signed-out visitors on any other page are sent to /results.
+
+For an existing database, run `import/public-view.sql` once in the Supabase SQL editor.

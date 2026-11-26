@@ -9,6 +9,16 @@
 -- automatically. Re-running with the same shooters and events updates their
 -- scores rather than duplicating them.
 --
+-- One row per shooter per class per event. shoot_class is RF, CF, LG or HG
+-- (blank = CF). match_type is club, state or registered (blank = club); it is
+-- used when the event is first created. Club shoots use RF/CF; State and
+-- Registered matches use RF/LG/HG.
+--
+-- If you already ran an earlier version of this script, run
+--   alter table import_results add column if not exists shoot_class text,
+--                              add column if not exists match_type text;
+-- and then run this whole file again.
+--
 -- One row per shooter per event. Each of the five cards has a score, group
 -- and flys (c1_score, c1_group, c1_flys ... c5_score, c5_group, c5_flys).
 
@@ -22,8 +32,12 @@ create table if not exists import_results (
   c2_score numeric default 0, c2_group numeric default 0, c2_flys int default 0,
   c3_score numeric default 0, c3_group numeric default 0, c3_flys int default 0,
   c4_score numeric default 0, c4_group numeric default 0, c4_flys int default 0,
-  c5_score numeric default 0, c5_group numeric default 0, c5_flys int default 0
+  c5_score numeric default 0, c5_group numeric default 0, c5_flys int default 0,
+  shoot_class        text,
+  match_type         text
 );
+alter table import_results add column if not exists shoot_class text;
+alter table import_results add column if not exists match_type text;
 
 -- Staging table is for admin use only (SQL editor / Table Editor).
 alter table import_results enable row level security;
@@ -53,9 +67,9 @@ begin
   get diagnostics n_members = row_count;
 
   -- Events (matched on date + description)
-  insert into events (event_date, description)
+  insert into events (event_date, description, match_type)
   select distinct on (event_date, lower(trim(event_description)))
-         event_date, trim(event_description)
+         event_date, trim(event_description), coalesce(nullif(lower(trim(match_type)), ''), 'club')
   from import_results r
   where not exists (
     select 1 from events e
@@ -66,8 +80,8 @@ begin
 
   -- Entries (invalid bays fail here with a clear error and nothing is saved).
   -- The five blank cards for each new entry are created automatically.
-  insert into entries (event_id, member_id, detail, bay)
-  select e.id, m.id, coalesce(r.detail, 1), upper(trim(r.bay))
+  insert into entries (event_id, member_id, shoot_class, detail, bay)
+  select e.id, m.id, coalesce(nullif(upper(trim(r.shoot_class)), ''), 'CF'), coalesce(r.detail, 1), upper(trim(r.bay))
   from import_results r
   join events e  on e.event_date = r.event_date
                 and lower(e.description) = lower(trim(r.event_description))
@@ -83,6 +97,7 @@ begin
                 and lower(e.description) = lower(trim(r.event_description))
   join members m on lower(m.name) = lower(trim(r.member_name))
   join entries en on en.event_id = e.id and en.member_id = m.id
+                and en.shoot_class = coalesce(nullif(upper(trim(r.shoot_class)), ''), 'CF')
   cross join lateral (values
     (1, r.c1_score, r.c1_group, r.c1_flys),
     (2, r.c2_score, r.c2_group, r.c2_flys),

@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase, EventRow } from "@/lib/supabase";
 import { useAdmin } from "@/lib/useAdmin";
+import { MATCH_NAMES, MatchType } from "@/lib/classes";
 
 export default function Events() {
   const isAdmin = useAdmin();
   const [events, setEvents] = useState<EventRow[]>([]);
   const [date, setDate] = useState("");
   const [description, setDescription] = useState("");
+  const [matchType, setMatchType] = useState<MatchType>("club");
   const [error, setError] = useState("");
 
   async function load() {
@@ -19,7 +21,7 @@ export default function Events() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    const { error } = await supabase.from("events").insert({ event_date: date, description });
+    const { error } = await supabase.from("events").insert({ event_date: date, description, match_type: matchType });
     if (error) return setError(error.message);
     setDate(""); setDescription(""); setError(""); load();
   }
@@ -31,17 +33,21 @@ export default function Events() {
         <form onSubmit={add} className="row">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
           <input placeholder="Event description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+          <select value={matchType} onChange={(e) => setMatchType(e.target.value as MatchType)}>
+            {(Object.keys(MATCH_NAMES) as MatchType[]).map((t) => <option key={t} value={t}>{MATCH_NAMES[t]}</option>)}
+          </select>
           <button type="submit">Add event</button>
         </form>
       )}
       {error && <p className="error">{error}</p>}
       <table>
-        <thead><tr><th>Date</th><th>Description</th></tr></thead>
+        <thead><tr><th>Date</th><th>Description</th><th>Type</th></tr></thead>
         <tbody>
           {events.map((ev) => (
             <tr key={ev.id}>
               <td>{ev.event_date}</td>
               <td><Link href={`/events/${ev.id}`}>{ev.description}</Link></td>
+              <td>{MATCH_NAMES[ev.match_type] ?? "Club shoot"}</td>
             </tr>
           ))}
         </tbody>

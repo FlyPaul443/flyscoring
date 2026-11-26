@@ -6,4 +6,4 @@ export const supabase = createClient(
 );
 
 export type Member = { id: number; name: string; Membership_Number: number | null };
-export type EventRow = { id: number; event_date: string; description: string };
+export type EventRow = { id: number; event_date: string; description: string; match_type: "club" | "state" | "registered" };
